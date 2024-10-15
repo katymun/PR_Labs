@@ -15,13 +15,12 @@ public class WebScraper {
     public static void main(String[] args) throws Exception {
         String urlStr = "https://www.myprotein.com/c/nutrition/protein/";
 
-        String htmlContent = fetchPage(urlStr);
+//        String htmlContent = fetchPage(urlStr);
+//        System.out.println(htmlContent);
+        Document doc = Jsoup.connect(urlStr).get();
 
-        Document doc = Jsoup.parse(htmlContent);
-
-        Elements products = doc.select(".product-card-wrapper");
-        System.out.println(products);
-
+        Elements products = doc.select(".product-card");
+        System.out.println(products.size());
         for (Element product : products) {
             String name = product.select(".product-item-title").text();
             String price = product.select(".price").text();
@@ -29,7 +28,6 @@ public class WebScraper {
             String fullProductLink = "https://www.myprotein.com" + productLink;
             String imageUrl = product.select("img").attr("src");
 
-            // Print the extracted details
             System.out.println("Product: " + name);
             System.out.println("Price: " + price);
             System.out.println("Link: " + fullProductLink);
