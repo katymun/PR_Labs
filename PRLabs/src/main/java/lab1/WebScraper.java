@@ -9,31 +9,78 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 
 public class WebScraper {
+
     public static void main(String[] args) throws Exception {
         String urlStr = "https://www.myprotein.com/c/nutrition/protein/";
 
-//        String htmlContent = fetchPage(urlStr);
-//        System.out.println(htmlContent);
         Document doc = Jsoup.connect(urlStr).get();
 
         Elements products = doc.select(".product-card");
         System.out.println(products.size());
+
+        List<Product> productList = new ArrayList<>();
+
         for (Element product : products) {
             String name = product.select(".product-item-title").text();
-            String price = product.select(".price").text();
+            String priceStr = product.select(".price").text().replace("£", "").trim();
             String productLink = product.select("a").attr("href");
             String fullProductLink = "https://www.myprotein.com" + productLink;
-            String imageUrl = product.select("img").attr("src");
 
-            System.out.println("Product: " + name);
-            System.out.println("Price: " + price);
-            System.out.println("Link: " + fullProductLink);
-            System.out.println("Image URL: " + imageUrl);
-            System.out.println("-------------------------");
+            // validation
+            if (name.isEmpty() || priceStr.isEmpty() || productLink.isEmpty()) {
+                continue;
+            }
+
+            Document productPage = Jsoup.connect(fullProductLink).get();
+            String description = productPage.select("#product-description-0").text();
+
+            System.out.println(priceStr);
+            double priceGBP = Double.parseDouble(priceStr);
+            productList.add(new Product(name, priceGBP, fullProductLink, description));
+
+//            System.out.println("Product: " + name);
+//            System.out.println("Price: " + priceGBP);
+//            System.out.println("Link: " + fullProductLink);
+//            System.out.println("Description: " + description);
+//            System.out.println("-------------------------");
         }
+        double gbpToEur = 1.15;
+
+        List<Product> convertedProducts = productList.stream()
+                .map(p -> new Product(
+                        p.getName(),
+                        convertPrice(p.getPrice(), gbpToEur),
+                        p.getLink(),
+                        p.getDescription()))
+                .collect(Collectors.toList());
+
+        // filtering the products
+        List<Product> filteredProducts = convertedProducts.stream()
+                .filter(p -> p.getPrice() >= 10 && p.getPrice() <= 30)
+                .collect(Collectors.toList());
+
+        System.out.println("Filtered products:");
+        for (Product prod : filteredProducts) {
+            System.out.println(prod);
+        }
+
+        double totalSum = filteredProducts.stream()
+                .map(Product::getPrice)
+                .reduce(0.0, Double::sum);
+
+        System.out.println("Total Price of Filtered Products: " + totalSum);
+        System.out.println("Timestamp (UTC): " + Instant.now());
+    }
+
+    private static double convertPrice(double priceGBP, double gbpToEur) {
+        return priceGBP * gbpToEur;
     }
 
     private static String fetchPage(String urlStr) throws Exception {
