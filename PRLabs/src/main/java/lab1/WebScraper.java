@@ -5,9 +5,13 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
+import java.io.OutputStreamWriter;
+import java.net.Socket;
 import java.net.URL;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -20,10 +24,11 @@ public class WebScraper {
     public static void main(String[] args) throws Exception {
         String urlStr = "https://www.myprotein.com/c/nutrition/protein/";
 
-        Document doc = Jsoup.connect(urlStr).get();
+        String htmlContent = fetchPage(urlStr);
+
+        Document doc = Jsoup.parse(htmlContent);
 
         Elements products = doc.select(".product-card");
-        System.out.println(products.size());
 
         List<Product> productList = new ArrayList<>();
 
@@ -41,7 +46,7 @@ public class WebScraper {
             Document productPage = Jsoup.connect(fullProductLink).get();
             String description = productPage.select("#product-description-0").text();
 
-            System.out.println(priceStr);
+//            System.out.println(priceStr);
             double priceGBP = Double.parseDouble(priceStr);
             productList.add(new Product(name, priceGBP, fullProductLink, description));
 
@@ -79,28 +84,39 @@ public class WebScraper {
         System.out.println("Timestamp (UTC): " + Instant.now());
     }
 
-    private static double convertPrice(double priceGBP, double gbpToEur) {
-        return priceGBP * gbpToEur;
-    }
-
     private static String fetchPage(String urlStr) throws Exception {
         URL url = new URL(urlStr);
-        HttpURLConnection con = (HttpURLConnection) url.openConnection();
-        con.setRequestMethod("GET");
+        String host = url.getHost();
+        String path = url.getPath();
 
-        con.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3");
+        SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
+        try (SSLSocket socket = (SSLSocket) factory.createSocket(host, 443)) {
+            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(), "UTF-8"));
+            writer.write("GET " + path + " HTTP/1.1\r\n");
+            writer.write("Host: " + host + "\r\n");
+            writer.write("Connection: close\r\n");
+            writer.write("User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3\r\n");
+            writer.write("\r\n");
+            writer.flush();
 
-        if (con.getResponseCode() >= 200 && con.getResponseCode() < 300) {
-            BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
-            String inputLine;
-            StringBuilder content = new StringBuilder();
-            while ((inputLine = in.readLine()) != null) {
-                content.append(inputLine);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            String line;
+            StringBuilder response = new StringBuilder();
+            boolean isBody = false;
+
+            while ((line = reader.readLine()) != null) {
+                if (line.isEmpty()) {
+                    isBody = true;
+                } else if (isBody) {
+                    response.append(line).append("\n");
+                }
             }
-            in.close();
-            return content.toString();
-        } else {
-            throw new Exception("Failed to fetch the page. Status code: " + con.getResponseCode());
+            System.out.println("response: " + response.toString());
+            return response.toString();
         }
+    }
+
+    private static double convertPrice(double priceGBP, double gbpToEur) {
+        return priceGBP * gbpToEur;
     }
 }
