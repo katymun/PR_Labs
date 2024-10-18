@@ -76,6 +76,9 @@ public class WebScraper {
             System.out.println(prod);
         }
 
+        System.out.println("JSON serialized filtered products:\n" + serializeToJson(filteredProducts) + "\n");
+        System.out.println("XML serialized filtered products:\n" + serializeToXml(filteredProducts) + "\n");
+
         double totalSum = filteredProducts.stream()
                 .map(Product::getPrice)
                 .reduce(0.0, Double::sum);
@@ -111,12 +114,46 @@ public class WebScraper {
                     response.append(line).append("\n");
                 }
             }
-            System.out.println("response: " + response.toString());
+//            System.out.println("response: " + response.toString());
             return response.toString();
         }
     }
 
     private static double convertPrice(double priceGBP, double gbpToEur) {
         return priceGBP * gbpToEur;
+    }
+
+    private static String serializeToJson(List<Product> products) {
+        StringBuilder jsonBuilder = new StringBuilder();
+        jsonBuilder.append("[\n");
+        for (int i = 0; i < products.size(); i++) {
+            Product product = products.get(i);
+            jsonBuilder.append("  {\n");
+            jsonBuilder.append("    \"name\": \"").append(product.getName()).append("\",\n");
+            jsonBuilder.append("    \"price\": ").append(product.getPrice()).append(",\n");
+            jsonBuilder.append("    \"link\": \"").append(product.getLink()).append("\",\n");
+            jsonBuilder.append("    \"description\": \"").append(product.getDescription()).append("\"\n");
+            jsonBuilder.append("  }");
+            if (i < products.size() - 1) {
+                jsonBuilder.append(",\n");
+            }
+        }
+        jsonBuilder.append("\n]");
+        return jsonBuilder.toString();
+    }
+
+    private static String serializeToXml(List<Product> products) {
+        StringBuilder xmlBuilder = new StringBuilder();
+        xmlBuilder.append("<products>\n");
+        for (Product p : products) {
+            xmlBuilder.append("  <product>\n");
+            xmlBuilder.append("    <name>").append(p.getName()).append("</name>\n");
+            xmlBuilder.append("    <price>").append(p.getPrice()).append("</price>\n");
+            xmlBuilder.append("    <link>").append(p.getLink()).append("</link>\n");
+            xmlBuilder.append("    <description>").append(p.getDescription()).append("</description>\n");
+            xmlBuilder.append("  </product>\n");
+        }
+        xmlBuilder.append("</products>");
+        return xmlBuilder.toString();
     }
 }
